@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:insert="/layout/header :: header"/>
+    <link rel="stylesheet" href="/assets/css/style.css">
+    <title>Document</title>
+</head>
+<body>
+<div id="main">
+    <div id="head">
+        <th:block th:insert="/layout/navbarDefault :: navbar"/>
+    </div>
+    <div id="head-link">
+    </div>
+    <div id="left">
+    </div>
+    <div id="content">
+        <table class="table table-hover">
+            <thead>
+            <tr class="table-dark">
+                <th scope="col">#</th>
+                <th scope="col">Name drinks</th>
+                <th scope="col">Price</th>
+                <th scope="col">Category</th>
+                <th scope="col">Description</th>
+                <th scope="col">Action</th>
+            </tr>
+            </thead>
+            <tbody id="tbProduct">
+            </tbody>
+        </table>
+    </div>
+    <div id="right">
+    </div>
+    <div id="footer">
+    </div>
+</div>
+
+<th:block th:insert="/layout/script :: script" />
+
+<th:block th:insert="/product/temp_option :: temp-option"/>
+
+<th:block th:insert="/product/list_table_lock :: temp-products"/>
+
+<script src="/assets/js/app.js"></script>
+
+<script>
+
+    let product = new Product();
+
+    let category = new Category();
+
+    let tempProduct = $.validator.format($.trim($("#tempProduct").val()));
+
+    let tempOption = $.validator.format($.trim($("#tempOption").val()));
+
+    let addRow = () => {
+        $("#tbProduct").prepend($(tempProduct(product.id, product.nameProduct, product.price,
+            product.categoryName, product.description)));
+    }
+
+    function loadProductLock() {
+        return $.ajax({
+            type: "GET",
+            headers: {
+                "Content-Type" : "application/json",
+                "Accept" : "application/json"
+            },
+            url : "http://localhost:8080/api/products/lockProduct"
+        })
+            .done(function (data) {
+                data.forEach(item => {
+                    product = item;
+                    addRow();
+                })
+
+            })
+    }
+
+    function findById(id) {
+        return $.ajax({
+            type: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            url: "http://localhost:8080/api/products/" + id,
+        })
+            .done(function (data) {
+                product = data;
+            })
+    }
+
+    function handleGroupModal() {
+        handlerShowConfirmSuspend();
+    }
+
+    function handlerShowConfirmSuspend() {
+
+        $(".btn-delete").on("click", function () {
+            App.SweetAlert.ShowConfirmSuspend("Do you want unSuspension this product").then(result => {
+                if (result.isConfirmed) {
+                    let id = $(this).data('id');
+
+                    findById(id).then(function () {
+
+                        doSuspension(id).then(function () {
+                            App.SweetAlert.showSuccessAlert('UnSuspended successfully');
+
+                            $("#tr_" + id).remove();
+
+                            handleGroupModal();
+                        })
+                    })
+                }
+            })
+        })
+    }
+
+    function doSuspension(id) {
+        return $.ajax({
+            type: "PUT",
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            url: "http://localhost:8080/api/products/unSuspension/" + id,
+        }).done(function () {
+
+        }).fail(function (jqXHR) {
+
+        });
+    }
+
+    function resetModal(formElement) {
+        $(formElement)[0].reset();
+        $(formElement).validate().resetForm();
+        $(formElement + ' input.error').removeClass("error");
+    }
+
+    function closeModal(modal, formElement) {
+        $(modal).on("hidden.bs.modal", function () {
+            $(modal + ' .modal-alert-danger').empty().removeClass('show').addClass('hide');
+            resetModal(formElement);
+        });
+    }
+
+    loadProductLock().then(function () {
+        handleGroupModal();
+    })
+
+    //     .then(function () {
+    //     ();
+    // })
+</script>
+</body>
+</html>

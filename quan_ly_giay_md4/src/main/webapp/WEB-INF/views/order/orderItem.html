@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:insert="/layout/header :: header"/>
+    <link rel="stylesheet" href="/assets/css/styleOrderItem.css">
+    <title>Document</title>
+</head>
+<body>
+<div id="main">
+    <div id="head">
+        <th:block th:insert="/layout/navbarDefault :: navbar"/>
+    </div>
+    <div id="head-link">
+    </div>
+    <div id="left">
+        <th:block th:object="${order}">
+            <input type="hidden" th:value="${order.id}" id="idOrder"/>
+        </th:block>
+    </div>
+    <div id="content">
+        <table class="table table-hover">
+            <thead>
+            <tr class="table-dark">
+                <th scope="col">#</th>
+                <th scope="col">Name drinks</th>
+                <th scope="col">Price</th>
+                <th scope="col">Category</th>
+                <th scope="col">Description</th>
+                <th scope="col" colspan="2">Action</th>
+            </tr>
+            </thead>
+            <tbody id="tbProduct">
+            </tbody>
+        </table>
+    </div>
+    <div id="right">
+        <table class="table table-hover">
+            <thead>
+            <tr class="table-dark">
+                <th scope="col">Name drinks</th>
+                <th scope="col">Price</th>
+                <th scope="col">Category</th>
+                <th scope="col">Quantity</th>
+                <th scope="col">Total</th>
+                <th scope="col" colspan="2">Action</th>
+            </tr>
+            </thead>
+            <tbody id="tbOrderItem">
+            </tbody>
+        </table>
+        <button class="btn btn-outline-success me-2 btn-paid-order" type="button">
+            <i class="fa-solid fa-plus"></i>
+            <span>Thanh toán tiền</span>
+        </button>
+        <button class="btn btn-outline-danger me-2 btn-cancel-order" type="button">
+            <i class="fa-solid fa-minus"></i>
+            <span>Hủy order</span>
+        </button>
+        <label>
+            <div id="totalBill"></div>
+        </label>
+        <input type="hidden" id="bill"/>
+    </div>
+    <div id="footer">
+    </div>
+</div>
+
+<th:block th:insert="/layout/script :: script"/>
+
+<th:block th:insert="/product/modalCreate :: modal-create"/>
+
+<th:block th:insert="/product/modalUpdate :: modal-update"/>
+
+<th:block th:insert="/product/temp_option :: temp-option"/>
+
+<th:block th:insert="/order/list_table_product_order :: temp-products"/>
+
+<th:block th:insert="/order/list_table_orderItem :: temp-orderItems"/>
+
+<script src="/assets/js/app.js"></script>
+
+<script>
+
+    let page = {
+        urls: {
+            getAllProduct : App.BASE_URL_PRODUCT + "/showProduct",
+
+        },
+        element: {},
+        loadData: {},
+        commands: {},
+        dialog: {
+            element: {},
+            loadData: {},
+            commands: {},
+            close: {},
+            alertDanger: {},
+            inputError: {}
+        }
+
+    }
+
+    let product = new Product();
+
+    let category = new Category();
+
+    let order = new Order();
+
+    let orderItem = new OrderItem();
+
+    let tempProduct = $.validator.format($.trim($("#tempProduct").val()));
+
+    let tempOrderItem = $.validator.format($.trim($("#tempOrderItem").val()));
+
+    let addRow = () => {
+        $("#tbProduct").prepend($(tempProduct(product.id, product.nameProduct, product.price,
+            product.categoryName, product.description)));
+    }
+
+    let addRowOrder = () => {
+        return $("#tbOrderItem").prepend($(tempOrderItem(orderItem.id, orderItem.nameProduct,
+            orderItem.price, orderItem.categoryName, orderItem.quantity, orderItem.total)))
+    }
+
+    function loadProduct() {
+        return $.ajax({
+            type: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            url: page.urls.getAllProduct,
+        })
+            .done(function (data) {
+                data.forEach(item => {
+                    product = item;
+                    addRow();
+                })
+            })
+    }
+
+
+    function handleGroupAction() {
+        handleAddOrderItem();
+        handlerShowConfirmSuspend();
+        handlePaidOrder();
+        handleRemoveOrder();
+        handleRemoveOrderItem();
+    }
+
+    function handleAddOrderItem() {
+        $("#tbProduct").on("click", ".btn-createOrderItem", function () {
+                let id = $(this).data("id");
+                addOrderItem(id).then(function () {
+                    getTotalBill($("#idOrder").val())
+                })
+            }
+        )
+    }
+
+
+    function handleRemoveOrderItem() {
+        $("#tbOrderItem").on("click", ".btn-minus", function () {
+            let id = $(this).data("id");
+            removeOrderItem(id).then(function () {
+            })
+        })
+    }
+
+    function addOrderItem(id) {
+        orderItem.idProduct = id;
+        orderItem.idOrder = +$("#idOrder").val()
+        return $.ajax({
+            type: "POST",
+            headers: {
+                "Content-type": "Application/json",
+                "Accept": "Application/json"
+            },
+            url: "http://localhost:8080/api/orders/createOrderItem/",
+            data: JSON.stringify(orderItem)
+        })
+            .done(function (data) {
+                orderItem = data;
+                if (orderItem.id == $(`#idOrderItem_${orderItem.id}`).val()) {
+                    let currentRow = $("#trOrderItem_" + orderItem.id);
+                    let updateRow = $(tempOrderItem(orderItem.id, orderItem.nameProduct,
+                        orderItem.price, orderItem.categoryName, orderItem.quantity, orderItem.total))
+                    currentRow.replaceWith(updateRow);
+                    App.IziToast.showSuccessAlert("Đã thêm: " + orderItem.nameProduct + " vào order");
+                } else {
+                    addRowOrder();
+                    App.IziToast.showSuccessAlert("Đã thêm: " + orderItem.nameProduct + " vào order");
+                }
+
+                //    handleRemoveOrderItem();
+
+
+            })
+    }
+
+    function getTotalBill(id) {
+        return $.ajax({
+            type: "GET",
+            headers: {
+                "Content-Type": "Application/json",
+                "Accept": "Application/json"
+            },
+            url: "http://localhost:8080/api/orders/totalBillBeforePaid/" + id,
+        })
+            .done(function (data) {
+                $("#totalBill").html("");
+                $("#totalBill").html("Tổng số tiền của Order là: " + data);
+                $("#bill").val(data);
+            })
+    }
+
+    function paidOrder() {
+        order.id = $("#idOrder").val();
+        order.totalBill = $("#bill").val();
+        $.ajax({
+            type: "PUT",
+            headers: {
+                "Content-Type": "Application/json",
+                "Accept": "Application/json"
+            },
+            url: "http://localhost:8080/api/orders/createOrder/",
+            data: JSON.stringify(order)
+        })
+            .done(function (data) {
+                setTimeout(function () {
+                    window.location.href = "http://localhost:8080/listOrder";
+                }, 1500);
+
+            })
+    }
+
+    function removeOrderItem(id) {
+        return $.ajax({
+            type: "PUT",
+            headers: {
+                "Content-Type": "Application/json",
+                "Accept": "Application/json"
+            },
+            url: "http://localhost:8080/api/orders/removeOrderItem/" + id,
+        })
+            .done(function (data) {
+                orderItem = data;
+                if (orderItem.quantity == 0) {
+                    let currentRow = $("#trOrderItem_" + id);
+                    currentRow.remove();
+                    App.IziToast.showErrorAlert("Xóa thành công!!!");
+                } else {
+                    let currentRow = $("#trOrderItem_" + id);
+                    let updateRow = $(tempOrderItem(orderItem.id, orderItem.nameProduct, orderItem.price,
+                        orderItem.categoryName, orderItem.quantity, orderItem.total));
+                    currentRow.replaceWith(updateRow);
+                    App.IziToast.showSuccessAlert("Xóa một đồ uống đã order thành công!!!");
+                }
+                getTotalBill($("#idOrder").val());
+            })
+            .fail(function (jxQHR) {
+
+            })
+
+    }
+
+    function removeOrder() {
+        return $.ajax({
+            type: "DELETE",
+            headers: {
+                "Content-Type": "Application/json",
+                "Accept": "Application/json"
+            },
+            url: "http://localhost:8080/api/orders/removeOrder/" + $("#idOrder").val()
+        })
+            .done(function () {
+
+            })
+
+            .fail(function () {
+
+            })
+    }
+
+    function handlePaidOrder() {
+        let btnPaidOrder = $(".btn-paid-order")
+        btnPaidOrder.on("click", function () {
+            App.SweetAlert.showSuccessAlert("Thanh toán thành công");
+            paidOrder();
+        })
+    }
+
+    function handleRemoveOrder() {
+        $(".btn-cancel-order").on("click", function () {
+            App.SweetAlert.ShowConfirmSuspend("Bạn có muốn hủy Order hay không ?").then(result => {
+                if (result.isConfirmed) {
+                    removeOrder();
+                    App.SweetAlert.showSuccessAlert("Bạn đã hủy Order thành công!!!")
+                    setTimeout(function () {
+                        window.location.href = "http://localhost:8080/listOrder"
+                    }, 2500)
+                }
+            })
+        })
+    }
+
+    function handlerShowConfirmSuspend() {
+
+        $(".btn-delete").on("click", function () {
+            App.SweetAlert.ShowConfirmSuspend().then(result => {
+                if (result.isConfirmed) {
+                    let id = $(this).data('id');
+
+                    findById(id).then(function () {
+
+                        doSuspension(id).then(function () {
+                            App.SweetAlert.showSuccessAlert('Suspended successfully');
+
+                            $("#tr_" + id).remove();
+
+                            handleGroupModal();
+                        })
+                    })
+                }
+            })
+        })
+    }
+
+    function doSuspension(id) {
+        return $.ajax({
+            type: "DELETE",
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            url: "http://localhost:8080/api/products/delete/" + id,
+        }).done(function () {
+
+        }).fail(function (jqXHR) {
+
+        });
+    }
+
+    loadProduct().then(function () {
+        handleGroupAction();
+    })
+
+    //     .then(function () {
+    //     ();
+    // })
+</script>
+</body>
+</html>

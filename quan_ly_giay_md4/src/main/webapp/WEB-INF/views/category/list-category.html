@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:insert="/layout/header :: header"/>
+    <link rel="stylesheet" href="/assets/css/style.css">
+    <title>Document</title>
+</head>
+<body>
+<div id="main">
+    <div id="head">
+        <th:block th:insert="/layout/navbarCategory :: navbarCategory"/>
+    </div>
+    <div id="head-link">
+    </div>
+    <div id="left">
+    </div>
+    <div id="content">
+        <table class="table table-hover">
+            <thead>
+            <tr class="table-dark">
+                <th scope="col">#</th>
+                <th scope="col">Name Category drinks</th>
+                <th scope="col" colspan="2">Action</th>
+            </tr>
+            </thead>
+            <tbody id="tbCategory">
+            </tbody>
+        </table>
+    </div>
+    <div id="right">
+    </div>
+    <div id="footer">
+    </div>
+</div>
+
+<th:block th:insert="/layout/script :: script"/>
+
+<th:block th:insert="/category/modalCreateCategory :: modal-create-category"/>
+
+<th:block th:insert="/category/modalUpdateCategory :: modal-update-category"/>
+
+<th:block th:insert="/category/list_table :: temp-categories"/>
+
+<script src="/assets/js/app.js"></script>
+
+<script>
+
+    let category = new Category();
+
+    let tempCategory = $.validator.format($.trim($("#tempCategory").val()));
+
+    let tempId = 0;
+
+    let addRow = () => {
+        $("#tbCategory").prepend($(tempCategory(category.id, category.name)));
+    }
+
+    function loadCategory() {
+        return $.ajax({
+            type: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            url: "http://localhost:8080/api/categories/"
+        })
+            .done(function (data) {
+                data.forEach(item => {
+                    category = item;
+                    addRow();
+                })
+            })
+        .fail(function (jqXHR) {
+            console.log(jqXHR);
+            App.SweetAlert.showErrorAlert("Không có loại thức uống nào, vui");
+            handleGroupModal();
+        })
+    }
+
+    function findCategoryById(id) {
+       return $.ajax({
+           type : "GET",
+           headers : {
+               "Content-Type" : "Application/json",
+               "Accept" : "Application/json"
+           },
+           url : "http://localhost:8080/api/categories/findCategoryById/" + id,
+       })
+        .done(function (data) {
+            tempId = category.id;
+            category = data;
+        })
+
+    }
+
+
+    function handleGroupModal() {
+        handleCreateForm();
+        handleUpdateForm();
+        handlerShowConfirmSuspend();
+    }
+
+    function handleCreateForm() {
+        let btnCreateCategory = $(".btn-createCategory");
+        btnCreateCategory.on("click", function () {
+            $("#createModalCategory").modal("show");
+
+        })
+    }
+
+    function handleUpdateForm() {
+        let btnUpdateCategory = $(".btn-updateCategory");
+        btnUpdateCategory.on("click", function () {
+            let id = $(this).data("id");
+            findCategoryById(id).then(function () {
+                tempId = category.id;
+                $("#nameCategoryUp").val(category.name);
+                $("#updateModalCategory").modal("show");
+            })
+
+        })
+    }
+
+    function handlerShowConfirmSuspend() {
+
+        $(".btn-delete").on("click", function () {
+            App.SweetAlert.ShowConfirmSuspend().then(result => {
+                if (result.isConfirmed) {
+                    let id = $(this).data('id');
+                    doSuspension(id).then(function () {
+                        App.SweetAlert.showSuccessAlert('Suspended successfully');
+
+                        $("#tr_" + id).remove();
+
+                        handleGroupModal();
+                    })
+                }
+            })
+        })
+    }
+
+    function doCreateCategory() {
+        category.id = 0;
+        category.name = $("#nameCategoryCreate").val();
+        return $.ajax({
+            type: "POST",
+            headers: {
+                "Content-Type": "Application/json",
+                "Accept": "Application/json"
+            },
+            url: "http://localhost:8080/api/categories/createCategory",
+            data: JSON.stringify(category)
+        })
+            .done(function (data) {
+                category = data
+                addRow();
+                App.SweetAlert.showSuccessAlert("Add category successful !!!");
+                $("#createModalCategory").modal("hide");
+                handleGroupModal();
+
+            })
+            .fail(function (jqXHR) {
+
+            })
+    }
+
+    function doUpdateCategory() {
+        console.log("Vào chưa")
+        category.id = tempId;
+        category.name = $("#nameCategoryUp").val();
+        return $.ajax({
+            type: "PUT",
+            headers: {
+                "Content-Type" : "Application/json",
+                "Accept" : "Application/json"
+            },
+            url : "http://localhost:8080/api/categories/updateCategory/" + category.id,
+            data: JSON.stringify(category)
+        })
+        .done(function (data) {
+            category = data;
+            let currentRow = $("#category_tr_" + category.id);
+            let updateRow = $(tempCategory(category.id,category.name));
+            currentRow.replaceWith(updateRow);
+            App.SweetAlert.showSuccessAlert("Update successful!!!");
+            $("#updateModalCategory").modal("hide")
+        })
+        .fail(function (jqXHR) {
+
+        })
+
+
+    }
+
+    function doSuspension(id) {
+        return $.ajax({
+            type: "DELETE",
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            url: "http://localhost:8080/api/products/delete/" + id,
+        }).done(function () {
+
+        }).fail(function (jqXHR) {
+
+        });
+    }
+
+    function resetModal(formElement) {
+        $(formElement)[0].reset();
+        $(formElement).validate().resetForm();
+        $(formElement + ' input.error').removeClass("error");
+    }
+
+    function closeModal(modal, formElement) {
+        $(modal).on("hidden.bs.modal", function () {
+            $(modal + ' .modal-alert-danger').empty().removeClass('show').addClass('hide');
+            resetModal(formElement);
+        });
+    }
+
+    $("#frmCreateCategory").validate({
+        rules : {
+            nameCategoryCreate : {
+                required : true
+            }
+        },
+        message : {
+            nameCategoryCreate: {
+                required: "Name category must required"
+            }
+        },
+        submitHandler : function () {
+            doCreateCategory();
+        }
+    })
+
+    $("#frmUpdateCategory").validate({
+        rules : {
+            nameCategoryUp : {
+                required : true
+            }
+        },
+        message: {
+            nameCategoryUp: {
+                required : "Name category can not null"
+            }
+        },
+       submitHandler : function () {
+            doUpdateCategory();
+       }
+    })
+
+    $("#btnCreateCategory").on("click", function () {
+        $("#frmCreateCategory").submit();
+    })
+
+    $("#btnUpdateCategory").on("click", function () {
+        console.log("Đã click chưa")
+        $("#frmUpdateCategory").submit();
+        console.log("Đã click xong");
+    })
+
+    closeModal("#createModalCategory","#frmCreateCategory");
+
+    closeModal("updateModalCategory","#frmUpdateCategory");
+
+    loadCategory().then(function () {
+        handleGroupModal();
+    })
+
+</script>
+</body>
+</html>

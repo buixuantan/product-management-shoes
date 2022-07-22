@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:insert="/layout/header :: header"/>
+    <link rel="stylesheet" href="/assets/css/style.css">
+    <title>Document</title>
+</head>
+<body>
+<div id="main">
+    <div id="head">
+        <th:block th:insert="/layout/navbarOrderItem :: navbar"/>
+    </div>
+    <div id="head-link">
+    </div>
+    <div id="left">
+    </div>
+    <div id="content">
+        <table class="table table-hover">
+            <thead>
+            <tr class="table-dark">
+                <th scope="col">#</th>
+                <th scope="col">Total bill</th>
+                <th scope="col">Date create order</th>
+                <th scope="col" colspan="2">Action</th>
+            </tr>
+            </thead>
+            <tbody id="tbOrder">
+            </tbody>
+        </table>
+    </div>
+    <div id="right">
+    </div>
+    <div id="footer">
+    </div>
+</div>
+
+<th:block th:insert="/layout/script :: script" />
+
+<th:block th:insert="/product/modalCreate :: modal-create"/>
+
+<th:block th:insert="/product/temp_option :: temp-option"/>
+
+<th:block th:insert="/order/list_table_order :: temp-orders"/>
+
+<script src="/assets/js/app.js"></script>
+
+<script>
+
+    let product = new Product();
+
+    let category = new Category();
+
+    let order = new Order();
+
+    let tempOrder = $.validator.format($.trim($("#tempOrder").val()));
+
+    let tempOption = $.validator.format($.trim($("#tempOption").val()));
+
+    let tampId = 0;
+
+    let addRow = () => {
+        $("#tbOrder").prepend($(tempOrder(order.id, order.totalBill, order.createAt)));
+    }
+
+    let addRowOption = (element, id, name) => {
+        $(element).append($(tempOption(id, name)));
+    }
+
+    function loadOrder() {
+        return $.ajax({
+            type: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            url: "http://localhost:8080/api/orders/showOrders"
+        })
+            .done(function (data) {
+                data.forEach(item => {
+                    order = item;
+                    addRow();
+                })
+            })
+    }
+
+    function drawListCategory() {
+        $.ajax({
+            url: "http://localhost:8080/api/categories/",
+            success: function (categories) {
+                $("#category").empty();
+
+                categories.forEach(item => {
+                    addRowOption("#category", item.id, item.name);
+                });
+            },
+            error: function () {
+
+            }
+        })
+    }
+
+    function findById(id) {
+        return $.ajax({
+            type: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            url: "http://localhost:8080/api/products/" + id,
+        })
+            .done(function (data) {
+                product = data;
+            })
+    }
+
+    function handleGroupModal() {
+        handleCreateForm();
+        handleUpdateForm();
+        handlerShowConfirmSuspend();
+    }
+
+    function handlerShowConfirmSuspend() {
+
+        $(".btn-delete").on("click", function () {
+            App.SweetAlert.ShowConfirmSuspend().then(result => {
+                if (result.isConfirmed) {
+                    let id = $(this).data('id');
+
+                    findById(id).then(function () {
+
+                        doSuspension(id).then(function () {
+                            App.SweetAlert.showSuccessAlert('Suspended successfully');
+
+                            $("#tr_" + id).remove();
+
+                            handleGroupModal();
+                        })
+                    })
+                }
+            })
+        })
+    }
+
+
+
+    function doSuspension(id) {
+        return $.ajax({
+            type: "DELETE",
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            url: "http://localhost:8080/api/products/delete/" + id,
+        }).done(function () {
+
+        }).fail(function (jqXHR) {
+
+        });
+    }
+
+    function resetModal(formElement) {
+        $(formElement)[0].reset();
+        $(formElement).validate().resetForm();
+        $(formElement + ' input.error').removeClass("error");
+    }
+
+    function closeModal(modal, formElement) {
+        $(modal).on("hidden.bs.modal", function () {
+            $(modal + ' .modal-alert-danger').empty().removeClass('show').addClass('hide');
+            resetModal(formElement);
+        });
+    }
+
+    closeModal("#createModal", "#frmCreate");
+
+    closeModal("#updateModal","#frmUpdate");
+
+    $("#frmCreate").validate({
+        rules: {
+            nameProduct: {
+                required: true,
+            },
+            price: {
+                required: true,
+                min: 10000,
+                max: 200000
+            },
+            description: {
+                required : true
+            }
+        },
+        messages: {
+            nameProduct: {
+                required: "Name drinks is required",
+
+            },
+            price: {
+                required: "Price is required",
+                min: "Price min is 10000",
+                max: "Price max is 200.000"
+            },
+            description: {
+                required: "Description is required"
+            }
+        },
+        submitHandler: function() {
+            doCreate();
+        }
+    });
+
+    $("#frmUpdate").validate({
+        rules: {
+            nameProductUp: {
+                required: true,
+            },
+            priceUp: {
+                required: true,
+                min: 10000,
+                max: 200000
+            },
+            descriptionUp: {
+                required : true
+            }
+        },
+        messages: {
+            nameProductUp: {
+                required: "Name drinks is required",
+
+            },
+            priceUp: {
+                required: "Price is required",
+                min: "Price min is 10000",
+                max: "Price max is 200.000"
+            },
+            descriptionUp: {
+                required: "Description is required"
+            }
+        },
+        submitHandler: function() {
+            doUpdate();
+        }
+    });
+
+    $("#btnCreate").on("click", function () {
+        $("#frmCreate").submit();
+    })
+
+    $("#btnUpdate").on("click", function () {
+        if(tampId != product.id) {
+            App.SweetAlert.showErrorAlert("This drinks is not drinks need update!!")
+        } else {
+            $("#frmUpdate").submit();
+        }
+    })
+
+    loadOrder().then(function () {
+        handleGroupModal();
+    })
+
+    //     .then(function () {
+    //     ();
+    // })
+</script>
+</body>
+</html>
